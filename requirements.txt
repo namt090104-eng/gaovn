@@ -1,0 +1,19 @@
+# Thư viện cốt lõi cho phân tích dữ liệu và mô hình Random Forest
+pandas~=2.2.3    # Để tải và xử lý dữ liệu dạng bảng (CSV)
+numpy~=1.26.4    # Tính toán mảng tốc độ cao
+scikit-learn~=1.2.2 # Thư viện chính cho Random Forest, PCA, Scaling và metrics
+# joblib~=1.5.2  # Thường được dùng để lưu/tải mô hình, nhưng pickle cũng đủ
+
+# Thư viện cho việc lưu/tải mô hình (thay thế cho TensorFlow/Keras)
+# pickle được tích hợp sẵn, nhưng đảm bảo numpy và scikit-learn đúng version.
+
+# Thư viện cho việc vẽ biểu đồ (Nếu bạn muốn vẽ biểu đồ Loss/Feature Importance)
+matplotlib~=3.7.2 # Vẽ biểu đồ Loss và các kết quả khác
+
+# Thư viện BẮT BUỘC để chạy Demo trên Streamlit
+streamlit~=1.35.0 # Khung công cụ để tạo ứng dụng web demo
+
+# Thư viện cho việc phân tích và trình bày (Tùy chọn)
+# (Bạn có thể thêm lại nếu cần)
+# seaborn~=0.12.2 # Vẽ biểu đồ thống kê đẹp hơn
+# featuretools~=1.31.0 # Nếu bạn có bước kỹ thuật đặc trưng phức tạp

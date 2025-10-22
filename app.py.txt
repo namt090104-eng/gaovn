@@ -1,0 +1,143 @@
+import streamlit as st
+import pickle
+import numpy as np
+import pandas as pd # Dùng để hiển thị xác suất
+
+# ==========================================================
+# CẤU HÌNH CỐT LÕI (CẦN THAY ĐỔI)
+# ==========================================================
+MODEL_PATH = 'random_forest_model.pkl'  # Tên file mô hình RF đã lưu
+SCALER_PATH = 'scaler.pkl'            # Tên file StandardScaler đã lưu
+PCA_PATH = 'pca.pkl'                  # Tên file PCA đã lưu
+
+# Tên các lớp gạo (Đảm bảo thứ tự này khớp với khi huấn luyện)
+CLASS_NAMES = [
+    'Gạo Thật (Class 1)', 'Gạo Thật (Class 2)', 'Gạo Giả (Plastic)', 'Gạo Hỏng', '...' 
+    # Thay thế bằng tên lớp thực tế của bạn
+]
+
+# Tên các đặc trưng gốc (PHẢI KHỚP VỚI ĐẶC TRƯNG ĐẦU VÀO)
+FEATURE_NAMES = [
+    'Area', 'Perimeter', 'MajorAxisLength', 'MinorAxisLength', 
+    'Eccentricity', 'ConvexArea', 'EquivalentDiameter'
+    # Thêm các đặc trưng khác bạn đã dùng
+]
+DEFAULT_FEATURE_VALUES = [5000, 300, 10.5, 5.2, 0.85, 4900, 70.0] 
+# ==========================================================
+
+@st.cache_resource
+def load_rf_components():
+    """Tải mô hình Random Forest, Scaler và PCA từ file .pkl."""
+    try:
+        with open(MODEL_PATH, 'rb') as f:
+            model = pickle.load(f)
+        with open(SCALER_PATH, 'rb') as f:
+            scaler = pickle.load(f)
+        with open(PCA_PATH, 'rb') as f:
+            pca = pickle.load(f)
+        return model, scaler, pca
+    except FileNotFoundError as e:
+        st.error(f"Lỗi tải file: Vui lòng kiểm tra các file .pkl ({e.filename}) đã được đẩy lên GitHub chưa.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Lỗi tải mô hình: {e}")
+        st.stop()
+
+def predict_features(input_data, model, scaler, pca, class_names):
+    """Tiền xử lý dữ liệu đặc trưng và dự đoán."""
+    try:
+        # 1. Chuyển đổi thành mảng numpy 2D (1 mẫu, N đặc trưng)
+        features = np.array(input_data).reshape(1, -1)
+        
+        # 2. Tiền xử lý (Phải theo đúng thứ tự: Scaling -> PCA)
+        features_scaled = scaler.transform(features)
+        features_pca = pca.transform(features_scaled)
+        
+        # 3. Dự đoán xác suất
+        predictions = model.predict_proba(features_pca)[0] # Lấy mảng xác suất 1D
+        
+        predicted_class_index = np.argmax(predictions)
+        confidence = np.max(predictions)
+
+        # Lấy top 3 dự đoán
+        top_k_indices = np.argsort(predictions)[::-1][:3]
+        top_k_results = [(class_names[i], predictions[i]) for i in top_k_indices]
+        
+        return class_names[predicted_class_index], confidence, top_k_results
+
+    except ValueError as e:
+        st.error(f"Lỗi định dạng dữ liệu: {e}")
+        return "Lỗi xử lý", 0.0, []
+    except Exception as e:
+        st.error(f"Lỗi trong quá trình dự đoán: {e}")
+        return "Lỗi xử lý", 0.0, []
+
+
+# ==========================================================
+# LOGIC ỨNG DỤNG CHÍNH
+# ==========================================================
+model, scaler, pca = load_rf_components()
+
+st.set_page_config(page_title="Phân Loại Gạo Random Forest", layout="centered")
+
+st.title("🍚 Ứng Dụng Phân Biệt Gạo Thật/Giả (Random Forest)")
+st.caption(f"Sử dụng {len(FEATURE_NAMES)} đặc trưng hình thái đã qua PCA để phân loại.")
+
+# -----------------
+# 1. Giao diện Nhập liệu (Sidebar)
+# -----------------
+with st.sidebar:
+    st.header("1. Nhập Đặc trưng Hạt Gạo")
+    st.info("Sử dụng các thanh trượt bên dưới để nhập các đặc trưng hình thái của hạt gạo mới.")
+    
+    input_data = []
+    
+    # Tạo ô nhập liệu cho từng đặc trưng
+    for i, feature in enumerate(FEATURE_NAMES):
+        val = st.number_input(
+            f"Nhập {feature}:", 
+            min_value=0.0, 
+            value=DEFAULT_FEATURE_VALUES[i],
+            step=0.1
+        )
+        input_data.append(val)
+
+# -----------------
+# 2. Nút Dự đoán và Hiển thị Kết quả
+# -----------------
+if st.sidebar.button('Phân Loại Hạt Gạo', type="primary"):
+    
+    if len(input_data) != len(FEATURE_NAMES):
+        st.error(f"Vui lòng nhập đủ {len(FEATURE_NAMES)} đặc trưng!")
+    else:
+        with st.spinner('Đang tiền xử lý dữ liệu và dự đoán...'):
+            
+            predicted_name, confidence, top_k_results = predict_features(
+                input_data, model, scaler, pca, CLASS_NAMES
+            )
+            
+            if predicted_name != "Lỗi xử lý":
+                st.success(f"✅ Dự đoán Thành Công!")
+                st.markdown("---")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown(f"**Kết quả Phân loại:**")
+                    st.markdown(f"<span style='color:green; font-size: 24px; font-weight: bold;'>{predicted_name}</span>", unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown(f"**Độ tin cậy:**")
+                    st.markdown(f"<span style='color:red; font-size: 24px; font-weight: bold;'>{confidence:.2%}</span>", unsafe_allow_html=True)
+                
+                st.markdown("---")
+                
+                # HIỂN THỊ CÁC KẾT QUẢ XÁC SUẤT CAO KHÁC
+                st.subheader("Phân tích Xác suất Chi tiết:")
+                
+                prob_df = pd.DataFrame(top_k_results, columns=['Loại Gạo', 'Xác suất'])
+                prob_df['Xác suất'] = prob_df['Xác suất'].apply(lambda x: f"{x:.2%}")
+                
+                st.dataframe(prob_df, hide_index=True)
+                
+st.info("Nhập các đặc trưng ở thanh bên trái và nhấn nút 'Phân Loại Hạt Gạo' để xem kết quả dự đoán.")
